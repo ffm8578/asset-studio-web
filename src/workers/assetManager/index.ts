@@ -1,5 +1,7 @@
-import { AssetType, loadAssetBundle } from '@arkntools/unity-js';
+import { AssetType, BundleEnv, loadAssetBundle } from '@arkntools/unity-js';
 import type { AssetFile, AssetFileLoadOptions, AssetObject } from '@arkntools/unity-js';
+
+const ALL_ENVS = [BundleEnv.NONE, BundleEnv.ARKNIGHTS, BundleEnv.ARKNIGHTS_ENDFIELD];
 import { FsaError, FsaErrorCode, FsaPromises } from '@tsuk1ko/fsa-promises';
 import { expose } from 'comlink';
 import { md5 as calcMd5 } from 'js-md5';
@@ -55,26 +57,45 @@ export class AssetManager {
     const errors: Array<FileLoadingError> = [];
     const infos: AssetInfo[] = [];
     let successNum = 0;
+
+    // Try preferred env first, then fall back to all others automatically
+    const envsToTry = [
+      options.env,
+      ...ALL_ENVS.filter(e => e !== options.env),
+    ];
+
     for (const [i, file] of files.entries()) {
-      try {
-        onProgress({
-          name: file.name,
-          progress: (i / files.length) * 100,
-          totalAssetNum: infos.length,
-        });
-        const timeLabel = `[AssetManager] load ${file.name}`;
-        console.time(timeLabel);
-        const result = await this.loadFile(file, options);
-        console.timeEnd(timeLabel);
-        console.log(`[AssetManager] ${result.length} assets loaded from ${file.name}`);
-        if (result.length) {
-          successNum++;
-          infos.push(...result);
+      onProgress({
+        name: file.name,
+        progress: (i / files.length) * 100,
+        totalAssetNum: infos.length,
+      });
+
+      let fileLoaded = false;
+      let lastError = '';
+
+      for (const env of envsToTry) {
+        try {
+          const timeLabel = `[AssetManager] load ${file.name} (env=${env ?? 'none'})`;
+          console.time(timeLabel);
+          const result = await this.loadFile(file, { ...options, env });
+          console.timeEnd(timeLabel);
+          if (result.length) {
+            console.log(`[AssetManager] ${result.length} assets loaded from ${file.name} with env=${env ?? 'none'}`);
+            successNum++;
+            infos.push(...result);
+            fileLoaded = true;
+            break;
+          }
+        } catch (error) {
+          lastError = String(error);
+          console.warn(`[AssetManager] env=${env ?? 'none'} failed for ${file.name}:`, error);
         }
-      } catch (error) {
-        errors.push({ name: file.name, error: String(error) });
-        console.error(`[AssetManager] failed to load ${file.name}`);
-        console.error(error);
+      }
+
+      if (!fileLoaded) {
+        errors.push({ name: file.name, error: lastError || 'No assets found in any environment' });
+        console.error(`[AssetManager] failed to load ${file.name} with all envs`);
       }
     }
     return { errors, infos, successNum };
@@ -168,8 +189,11 @@ export class AssetManager {
     const md5 = calcMd5(buffer);
 
     const fileInfo = { fileId: md5, fileName: file.name };
-    const bundle = this.bundleMap.get(md5) || (await loadAssetBundle(buffer, options));
-    if (!this.bundleMap.has(md5)) this.bundleMap.set(md5, bundle);
+    const cacheKey = `${md5}_${options?.env ?? ''}`;
+    const bundle = this.bundleMap.get(cacheKey) || (await loadAssetBundle(buffer, options));
+    if (!this.bundleMap.has(cacheKey)) this.bundleMap.set(cacheKey, bundle);
+    // Always update plain md5 key so getAssetObj() can find the winning bundle
+    this.bundleMap.set(md5, bundle);
 
     return Promise.all(
       bundle.objects
