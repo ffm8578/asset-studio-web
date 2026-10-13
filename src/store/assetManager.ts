@@ -2,6 +2,7 @@ import type { AssetFileLoadOptions } from '@arkntools/unity-js';
 import { proxy, wrap } from 'comlink';
 import { defineStore } from 'pinia';
 import type { RepoDataHandler } from '@/types/repository';
+import { expandCompressedFiles } from '@/utils/compress';
 import { showBatchFilesResultMessage, showNotingCanBeExportToast } from '@/utils/toasts';
 import type { BatchFilesResult } from '@/utils/toasts';
 import type { AssetInfo, ExportAssetsOnProgress, FileLoadingOnProgress } from '@/workers/assetManager';
@@ -57,6 +58,9 @@ export const useAssetManager = defineStore('assetManager', () => {
     isLoading.value = true;
     curAssetInfo.value = undefined;
     try {
+      // Expand any ZIP or GZIP archives into their contents first
+      files = await expandCompressedFiles(files);
+
       const { errors, infos, successNum } = await (
         await manager
       ).loadFiles(
@@ -70,13 +74,8 @@ export const useAssetManager = defineStore('assetManager', () => {
       );
       assetInfos.value = infos;
       if (!infos.length) {
-        const hint = errors.length
-          ? ` (${errors.length} file${errors.length > 1 ? 's' : ''} failed to parse)`
-          : setting.data.unityEnv
-            ? ` — check that the Unity environment setting matches the file's game`
-            : '';
         ElMessage({
-          message: `No assets loaded from ${files.length} file${files.length > 1 ? 's' : ''}${hint}`,
+          message: `No assets loaded from ${files.length} file${files.length > 1 ? 's' : ''} — file may be unsupported or corrupted`,
           type: 'warning',
           duration: 6000,
         });
