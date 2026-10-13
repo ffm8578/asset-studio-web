@@ -58,8 +58,16 @@ export const useAssetManager = defineStore('assetManager', () => {
     isLoading.value = true;
     curAssetInfo.value = undefined;
     try {
-      // Expand any ZIP or GZIP archives into their contents first
-      files = await expandCompressedFiles(files);
+      // Expand any ZIP / GZIP / LZ4 / LZMA archives into their contents first
+      const expanded = await expandCompressedFiles(files);
+      expanded.errors.forEach(({ name, error }) => {
+        ElMessage({ message: `Failed to decompress ${name}: ${error}`, type: 'error', duration: 8000 });
+      });
+      if (!expanded.files.length) {
+        isLoading.value = false;
+        return;
+      }
+      files = expanded.files;
 
       const { errors, infos, successNum } = await (
         await manager
