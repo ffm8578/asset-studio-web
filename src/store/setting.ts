@@ -29,7 +29,7 @@ export const useSetting = defineStore('setting', () => {
       exportGroupMethod: ExportGroupMethod.NONE,
       unityCNKeyEnabled: false,
       unityCNKey: '',
-      unityEnv: BundleEnv.ARKNIGHTS,
+      unityEnv: BundleEnv.NONE,
       fsbConvertFormat: FsbConvertFormat.MP3,
       fsbConvertVbrQuality: 0,
     },
