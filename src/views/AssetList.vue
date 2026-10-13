@@ -71,7 +71,7 @@
         </VxeColumn>
         <template #empty>
           <el-text :style="{ fontSize: '30px', color: 'var(--el-color-info-light-3)' }">
-            {{ filteredAssetInfos.length ? 'No data' : 'Drop files here or click "File" menu to load files' }}
+            {{ emptyStateMessage }}
           </el-text>
         </template>
       </VxeTable>
@@ -158,6 +158,13 @@ const searchedAssetInfos = computed(
     searchInputRef.value?.doSearch({ list: filteredAssetInfos.value, valueGetter: searchValueGetter }) ||
     filteredAssetInfos.value,
 );
+
+const emptyStateMessage = computed(() => {
+  if (!store.assetInfos.length) return 'Drop files here or click "File" menu to load files';
+  if (!filteredAssetInfos.value.length)
+    return `${store.assetInfos.length} asset${store.assetInfos.length > 1 ? 's' : ''} loaded but all are hidden — disable "Hide Nameless Assets" in Options to view them`;
+  return 'No data';
+});
 
 const getAssetNameSortIndex = useNatsort(() => store.assetInfos.map(({ name }) => name));
 const sortNameMethod: VxeColumnPropTypes.SortBy<AssetInfo> = ({ row }) => getAssetNameSortIndex(row.name);
