@@ -123,37 +123,50 @@ async function decompressLzma(buffer: ArrayBuffer, name: string): Promise<File> 
 
 // ─── Main expand function ─────────────────────────────────────────────────────
 
+export interface ExpandResult {
+  files: File[];
+  errors: Array<{ name: string; error: string }>;
+}
+
 async function expandFile(file: File, depth = 0): Promise<File[]> {
   if (depth > 3) return [file];
   const buffer = await file.arrayBuffer();
   const header = new Uint8Array(buffer, 0, Math.min(16, buffer.byteLength));
 
-  try {
-    if (isZip(header)) {
-      const extracted = await extractZip(buffer);
-      if (!extracted.length) return [file];
-      return (await Promise.all(extracted.map(f => expandFile(f, depth + 1)))).flat();
-    }
-    if (isGzip(header)) {
-      return expandFile(await decompressGzip(buffer, file.name), depth + 1);
-    }
-    if (isLz4(header)) {
-      return expandFile(decompressLz4(buffer, file.name), depth + 1);
-    }
-    if (isLzma(header) || isXz(header)) {
-      return expandFile(await decompressLzma(buffer, file.name), depth + 1);
-    }
-  } catch (e) {
-    console.warn(`[compress] Failed to decompress ${file.name}:`, e);
+  if (isZip(header)) {
+    const extracted = await extractZip(buffer);
+    if (!extracted.length) throw new Error('ZIP archive is empty or uses unsupported compression');
+    return (await Promise.all(extracted.map(f => expandFile(f, depth + 1)))).flat();
+  }
+  if (isGzip(header)) {
+    return expandFile(await decompressGzip(buffer, file.name), depth + 1);
+  }
+  if (isLz4(header)) {
+    return expandFile(decompressLz4(buffer, file.name), depth + 1);
+  }
+  if (isLzma(header) || isXz(header)) {
+    return expandFile(await decompressLzma(buffer, file.name), depth + 1);
   }
 
+  // Not a recognised archive — treat as raw bundle
   return [file];
 }
 
 /**
  * Recursively expand ZIP, GZIP, LZ4, LZMA, and XZ files into their contents.
- * Non-archive files pass through unchanged.
+ * Returns expanded files plus any per-file decompression errors.
  */
-export async function expandCompressedFiles(files: File[]): Promise<File[]> {
-  return (await Promise.all(files.map(f => expandFile(f)))).flat();
+export async function expandCompressedFiles(files: File[]): Promise<ExpandResult> {
+  const out: File[] = [];
+  const errors: Array<{ name: string; error: string }> = [];
+  for (const file of files) {
+    try {
+      const expanded = await expandFile(file);
+      out.push(...expanded);
+    } catch (e) {
+      console.error(`[compress] ${file.name}:`, e);
+      errors.push({ name: file.name, error: String(e) });
+    }
+  }
+  return { files: out, errors };
 }
