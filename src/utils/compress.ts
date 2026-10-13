@@ -110,10 +110,10 @@ function decompressLz4(buffer: ArrayBuffer, name: string): File {
 // ─── LZMA / XZ (via lzma-js npm package) ─────────────────────────────────────
 
 async function decompressLzma(buffer: ArrayBuffer, name: string): Promise<File> {
-  const { decompress } = await import('lzma-js');
+  const LZMA = await import('lzma');
   const input = Array.from(new Uint8Array(buffer));
   const out: number[] = await new Promise((res, rej) =>
-    decompress(input, (result: number[] | string, err: any) =>
+    LZMA.decompress(input, (result: number[] | string, err: any) =>
       err ? rej(new Error(String(err))) : res(result as number[]),
     ),
   );
