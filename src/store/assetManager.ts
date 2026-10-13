@@ -70,9 +70,15 @@ export const useAssetManager = defineStore('assetManager', () => {
       );
       assetInfos.value = infos;
       if (!infos.length) {
+        const hint = errors.length
+          ? ` (${errors.length} file${errors.length > 1 ? 's' : ''} failed to parse)`
+          : setting.data.unityEnv
+            ? ` — check that the Unity environment setting matches the file's game`
+            : '';
         ElMessage({
-          message: `No assets loaded from ${files.length} files`,
+          message: `No assets loaded from ${files.length} file${files.length > 1 ? 's' : ''}${hint}`,
           type: 'warning',
+          duration: 6000,
         });
       } else if (files.length === 1 && errors.length) {
         errors.forEach(({ name, error }) => {
@@ -83,8 +89,16 @@ export const useAssetManager = defineStore('assetManager', () => {
         });
       } else {
         ElMessage({
-          message: `Loaded ${infos.length} assets from ${successNum} files`,
+          message: `Loaded ${infos.length} assets from ${successNum} file${successNum > 1 ? 's' : ''}`,
           type: 'success',
+        });
+      }
+      // Warn separately if hideNamelessAssets is hiding everything that was loaded
+      if (infos.length && setting.data.hideNamelessAssets && infos.every(({ name }) => !name)) {
+        ElMessage({
+          message: `All ${infos.length} loaded asset${infos.length > 1 ? 's have' : ' has'} no name and ${infos.length > 1 ? 'are' : 'is'} hidden. Disable "Hide Nameless Assets" in Options to view them.`,
+          type: 'warning',
+          duration: 8000,
         });
       }
     } catch (error) {
