@@ -30,6 +30,7 @@ const nodePolyfillPlugins = () =>
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
+  base: '/asset-studio-web/',
   build: {
     chunkSizeWarningLimit: 5000,
   },
