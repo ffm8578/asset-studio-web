@@ -82,10 +82,14 @@ export const useAssetManager = defineStore('assetManager', () => {
       );
       assetInfos.value = infos;
       if (!infos.length) {
+        // Show the first specific error if available, otherwise generic message
+        const firstError = errors[0];
         ElMessage({
-          message: `No assets loaded from ${files.length} file${files.length > 1 ? 's' : ''} — file may be unsupported or corrupted`,
+          message: firstError
+            ? `Failed to load ${firstError.name}: ${firstError.error.split('|')[0].trim()}`
+            : `No assets loaded from ${files.length} file${files.length > 1 ? 's' : ''} — file may be unsupported or corrupted`,
           type: 'warning',
-          duration: 6000,
+          duration: 10000,
         });
       } else if (files.length === 1 && errors.length) {
         errors.forEach(({ name, error }) => {
